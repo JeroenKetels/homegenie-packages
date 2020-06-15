@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-16"?>
+<ProgramBlock xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ScriptSetup>const string MODULES_DOMAIN = "Knx.Automation";
+  Program.Setup(()=&gt;{
+    Program.UseWidget("homegenie/generic/program");
+  });
+</ScriptSetup>
+  <ScriptSource>const string MODULES_DOMAIN = "Knx.Automation";
+
+// read all properties from modules defined in xml
+Modules
+  .InDomain(MODULES_DOMAIN)
+  .Off();
+
+Program.GoBackground();
+</ScriptSource>
+  <ScriptErrors />
+  <Domain>HomeAutomation.HomeGenie.Automation</Domain>
+  <Address>29</Address>
+  <Name>AllesUit</Name>
+  <Description>Dit programma schakelt alles uit met 1 druk op de knop.</Description>
+  <Group>Devices and Things</Group>
+  <Features />
+  <AutoRestartEnabled>true</AutoRestartEnabled>
+  <ActivationTime>2021-02-11T22:09:05.6943245Z</ActivationTime>
+  <TriggerTime>2021-02-11T22:09:05.732319Z</TriggerTime>
+  <Type>CSharp</Type>
+  <IsEnabled>true</IsEnabled>
+</ProgramBlock>

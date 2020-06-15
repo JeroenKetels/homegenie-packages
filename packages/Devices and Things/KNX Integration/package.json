@@ -1,0 +1,33 @@
+{
+    "author": "Jeroen Ketels",
+    "version": "v1.1",
+    "title": "KNX Integration",
+    "description": "KNX modules",
+    "published": "2020-02-12T00:00:00Z",
+    "sourcecode": "",
+    "homepage": "", 
+    "widgets": [ ],
+    "programs": [
+      {
+        "file": "KNX_Automation.hgx",
+        "name": "KNX interface",
+        "description": "KNX device modules",
+        "uid": "28",
+        "group": "Devices and Things"
+      },
+      {
+        "file": "KNX_AllesUit.hgx",
+        "name": "Alles Uit",
+        "description": "Doe alle Knx Toestellen Uit",
+        "uid": "29",
+        "group": "Devices and Things"
+      }
+    ],
+    "interfaces": [ 
+        { 
+            "file": "MIG.KNXAutomation.zip",
+            "name":"Knx Integration",
+            "description": "Knx Integration App",
+            "group": "Devices and Things" 
+        }]
+}

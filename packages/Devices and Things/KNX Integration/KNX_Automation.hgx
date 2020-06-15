@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-16"?>
+<ProgramBlock xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ScriptSetup>const string MODULES_DOMAIN = "Knx.Automation";
+Program.Setup(() =&gt; {
+  Program
+    .AddOption("KnxLocalIp", "", "Local endpoint IP address (optional)", "text")
+    .AddOption("KnxLocalPort","", "Local endpoint port (optional)", "text")
+    .AddOption("KnxRemoteIp", "", "Remote endpoint IP address (optional)", "text")
+    .AddOption("KnxRemotePort","", "Remote endpoint port (optional)", "text")
+    .AddOption("KnxActionMessageCode","0x29", "Some KNX Routers/Interfaces might need this parameter defined, some of them need this to be 0x29.(optional)", "text");
+
+  	// read all properties from modules defined in xml
+    Modules
+    .InDomain(MODULES_DOMAIN)
+    .Command("GetProperties")
+    .Execute();
+  
+  	// Set the name and the description for the Modules
+    Modules
+    .InDomain(MODULES_DOMAIN)
+    .Each((module) =&gt; {
+        module.Instance.Name = module.Instance.Properties.First(x =&gt; x.Is("KNX.Automation.DefaultName")).GetData&lt;String&gt;();
+        module.Instance.Description = module.Instance.Properties.First(x =&gt; x.Is("KNX.Automation.Description")).GetData&lt;String&gt;();
+        return false;
+    });
+    
+});
+Program.Run();
+</ScriptSetup>
+  <ScriptSource>const string MODULES_DOMAIN = "Knx.Automation";
+const string EVENT_DESCRIPTION = "KNX Module";
+
+var localIp = Program.Option("KnxLocalIp").Value;
+var localPort = (int)Program.Option("KnxLocalPort").DecimalValue;
+var remoteIp = Program.Option("KnxRemoteIp").Value;
+var remotePort = (int)Program.Option("KnxRemotePort").DecimalValue;
+var actionMessageCode = Program.Option("KnxActionMessageCode").Value;
+
+var knx = KnxClient;
+knx.ActionMessageCode(actionMessageCode);
+
+if (!String.IsNullOrWhiteSpace(localIp) &amp;&amp; !String.IsNullOrWhiteSpace(remoteIp))
+{
+  knx.EndPoint(localIp, localPort &gt; 0 ? localPort : 3671, remoteIp, remotePort &gt; 0 ? remotePort : 3671);
+}
+else if (!String.IsNullOrWhiteSpace(localIp))
+{
+  if (localPort &gt; 0)  
+  {
+    knx.EndPoint(localIp, localPort);
+  }
+  else
+  {
+    knx.EndPoint(localIp);
+  }
+}
+
+knx
+  .Connect()
+  .OnStatusReceived((address, status)=&gt;{ 
+    // TODO: should update virtual module parameters
+  })
+  .OnEventReceived((address, status)=&gt;{ 
+    // TODO: should update virtual module parameters
+    var knxModules = Modules.InDomain(MODULES_DOMAIN);
+    ModuleHelper currentModule = null;
+    knxModules.Each((module) =&gt; {
+      if(module.Parameter("KNX.Address").Value != address &amp;&amp; module.Parameter("KNX.StatusAddress").Value != address)
+          		return false;
+      
+      	currentModule = module;
+      	Program.Notify("KNX Module Status Received", currentModule.Instance.Name);
+        var statusnumber = Encoding.UTF8.GetBytes(status)[0];
+     
+        if(statusnumber == 0) {
+           Program.RaiseEvent(currentModule, "Status.Level", "0", EVENT_DESCRIPTION);
+        }
+        else 
+            Program.RaiseEvent(currentModule, "Status.Level", "1", EVENT_DESCRIPTION);
+        
+        return false;
+    });
+  });
+    
+// - http://&lt;hg_address&gt;/api/Knx.AutomationInterface/...
+When.WebServiceCallReceived(MODULES_DOMAIN, ( args ) =&gt; {
+  string[] reqs = ((string)args).Split('/');
+  try
+  {
+    string lightnumber = reqs[1];
+    string command = reqs[2];
+    //string parameter = ""; if (reqs.Length &gt; 3) parameter = Uri.UnescapeDataString(reqs[3]);
+    //
+    var knxModules = Modules.InDomain(MODULES_DOMAIN);
+    var module = knxModules.WithAddress(lightnumber).Get();
+  
+    var knxAddress = module.Parameter("KNX.Address");
+    if (knxAddress == null)
+    {
+      return "{ 'ResponseValue' : 'ERROR: module KNX address not configured.' }";
+    }
+    Program.Notify("knxAddress:" + knxAddress.Value);
+    //
+    switch(command)
+    {
+      // eg. http://&lt;hg_address&gt;/api/Knx.AutomationInterface/&lt;light_number&gt;/Control.On
+      case "Control.On":
+      knx.Action(knxAddress.Value, true);
+      module.RaiseEvent("Status.Level", "1", EVENT_DESCRIPTION);
+      break;
+      // eg. http://&lt;hg_address&gt;/api/Knx.AutomationInterface/&lt;light_number&gt;/Control.Off
+      case "Control.Off":
+      knx.Action(knxAddress.Value, false);
+      module.RaiseEvent("Status.Level", "0", EVENT_DESCRIPTION);
+      break;
+      // eg. http://&lt;hg_address&gt;/api/Knx.AutomationInterface/&lt;light_number&gt;/Control.Toggle
+      case "Control.Toggle":
+      if (module.Parameter("Status.Level").DecimalValue == 0)
+      {
+        knx.Action(knxAddress.Value, true);
+        module.RaiseEvent("Status.Level", "1", EVENT_DESCRIPTION);
+      }
+      else
+      {
+        knx.Action(knxAddress.Value, false);
+        module.RaiseEvent("Status.Level", "0", EVENT_DESCRIPTION);
+      }
+      break;
+      // eg. http://&lt;hg_address&gt;/api/Knx.AutomationInterface/&lt;light_number&gt;/Control.AllOff
+      case "Control.AllOff":
+      var modules = Modules
+        .WithFeature("Status.Level")
+        .Each((mod) =&gt; {
+          mod.RaiseEvent("Status.Level", "0", EVENT_DESCRIPTION);
+            return false;
+        });
+      break;
+   }
+    return "{ 'ResponseValue' : 'OK' }";    
+  } catch (Exception e) { 
+    Program.Notify(MODULES_DOMAIN + " ERROR!", e.Message);
+  }
+  return "{ 'ResponseValue' : 'ERROR' }";
+});
+
+Program.GoBackground();
+</ScriptSource>
+  <Domain>HomeAutomation.HomeGenie.Automation</Domain>
+  <Address>28</Address>
+  <Name>KNX device modules</Name>
+  <Description>Adds modules for KNX.</Description>
+  <Group>Devices and Things</Group>
+  <AutoRestartEnabled>true</AutoRestartEnabled>
+  <Type>CSharp</Type>
+  <IsEnabled>false</IsEnabled>
+</ProgramBlock>
